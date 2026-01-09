@@ -130,7 +130,7 @@ MODELS, LEAF_MODEL = load_models()
 # --- 5. ANALİZ MANTIĞI ---
 def run_analysis(img):
     # max_det=1 -> SADECE 1 KUTU
-    res = LEAF_MODEL(img, verbose=False, conf=0.25, max_det=1)[0]
+    res = LEAF_MODEL(img, verbose=False, conf=0.85, max_det=1)[0]
     box_img = None
     is_leaf = False
     
