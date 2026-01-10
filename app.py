@@ -97,9 +97,9 @@ DISEASE_INFO = {
         "treatment": "Rutin bakım (sulama, gübreleme) işlemlerine devam ediniz."
     },
     "Unknown": {
-        "name": "TANIMLANAMADI",
-        "desc": "Görüntü net değil.",
-        "treatment": "Lütfen daha net bir fotoğraf çekiniz."
+        "name": "TANIMLANAMADI / BİLGİM YOK",
+        "desc": "Hastalık hakkında yeterli bilgiye ulaşılamadı veya teşhis oranı çok düşük.",
+        "treatment": "Bu hastalık hakkında bilgim yok. Lütfen bir ziraat mühendisine danışınız."
     }
 }
 
@@ -129,8 +129,11 @@ MODELS, LEAF_MODEL = load_models()
 
 # --- 5. ANALİZ MANTIĞI ---
 def run_analysis(img):
-    # max_det=1 -> SADECE 1 KUTU
-    res = LEAF_MODEL(img, verbose=False, conf=0.85, max_det=1)[0]
+    # --- AYAR: GÜVEN EŞİĞİ (%70) ---
+    CONF_THRESHOLD = 0.70 
+    
+    # 1. Yaprak Tespiti
+    res = LEAF_MODEL(img, verbose=False, conf=0.60, max_det=1)[0]
     box_img = None
     is_leaf = False
     
@@ -142,22 +145,29 @@ def run_analysis(img):
     
     if not is_leaf: return None
 
+    # 2. Hastalık Oylaması
     votes = {}
     for name, model in MODELS.items():
         r = model(img, verbose=False)[0]
         if r.probs:
             conf = float(r.probs.top1conf)
-            lbl = CLASS_NAMES[r.probs.top1] if conf > 0.55 else "Unknown"
+            
+            # EĞER ORAN %70'İN ALTINDAYSA "UNKNOWN" KABUL ET
+            if conf > CONF_THRESHOLD:
+                lbl = CLASS_NAMES[r.probs.top1]
+            else:
+                lbl = "Unknown"
+
             w = MODEL_DATA[name]["weight"]
-            if lbl == "Unknown": w *= 0.2
+            if lbl == "Unknown": w *= 0.5 # Unknown oylarının ağırlığını düşür
             votes[lbl] = votes.get(lbl, 0) + w
             
     best_class = max(votes, key=votes.get)
     return {"class": best_class, "box_img": box_img}
 
-# --- 6. YAN MENÜ (SIDEBAR) - YEREL RESİMLER ---
+# --- 6. YAN MENÜ (SIDEBAR) ---
 with st.sidebar:
-    # 1. ÜST LOGO (olive.jpg)
+    # 1. ÜST LOGO
     if os.path.exists("olive.jpg"):
         st.image("olive.jpg", use_container_width=True)
     else:
@@ -172,7 +182,7 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # 2. ALT GÖRSEL (farmer.jpg)
+    # 2. ALT GÖRSEL
     if os.path.exists("farmer.jpg"):
         st.image("farmer.jpg", caption="Çiftçi Dostu Teknoloji", use_container_width=True)
     
@@ -232,7 +242,7 @@ if uploaded_file:
                 
                 theme_color = "#2E7D32" if res['class'] == 'healthy' else ("#757575" if res['class'] == 'Unknown' else "#d32f2f")
 
-                # SONUÇ KARTI (Yüzde YOK)
+                # SONUÇ KARTI
                 st.markdown(f"""
                 <div class="result-card" style="border-top-color: {theme_color};">
                     <div class="result-label">TESPİT EDİLEN DURUM</div>
