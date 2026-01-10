@@ -97,9 +97,9 @@ DISEASE_INFO = {
         "treatment": "Rutin bakım (sulama, gübreleme) işlemlerine devam ediniz."
     },
     "Unknown": {
-        "name": "TANIMLANAMADI / BİLGİM YOK",
-        "desc": "Hastalık hakkında yeterli bilgiye ulaşılamadı veya teşhis oranı çok düşük.",
-        "treatment": "Bu hastalık hakkında bilgim yok. Lütfen bir ziraat mühendisine danışınız."
+        "name": "TANIMLANAMADI / GÖRÜNTÜ HATALI",
+        "desc": "Modeller bu görüntüden yeterince emin olamadı. Görüntüde yaprak dışı unsurlar (kalem, gölge vb.) olabilir.",
+        "treatment": "Lütfen üzerinde çizim veya yabancı cisim olmayan net bir yaprak fotoğrafı yükleyiniz."
     }
 }
 
@@ -127,10 +127,11 @@ def load_models():
 
 MODELS, LEAF_MODEL = load_models()
 
-# --- 5. ANALİZ MANTIĞI ---
+# --- 5. ANALİZ MANTIĞI (GÜNCELLENDİ) ---
 def run_analysis(img):
-    # --- AYAR: GÜVEN EŞİĞİ (%70) ---
-    CONF_THRESHOLD = 0.70 
+    # --- KRİTİK AYAR: GÜVEN EŞİĞİ YÜKSELTİLDİ (%85) ---
+    # Model bir sonuca varmak için artık en az %85 emin olmalı.
+    CONF_THRESHOLD = 0.85 
     
     # 1. Yaprak Tespiti
     res = LEAF_MODEL(img, verbose=False, conf=0.60, max_det=1)[0]
@@ -152,14 +153,15 @@ def run_analysis(img):
         if r.probs:
             conf = float(r.probs.top1conf)
             
-            # EĞER ORAN %70'İN ALTINDAYSA "UNKNOWN" KABUL ET
+            # EĞER ORAN %85'İN ALTINDAYSA "UNKNOWN" KABUL ET
             if conf > CONF_THRESHOLD:
                 lbl = CLASS_NAMES[r.probs.top1]
             else:
                 lbl = "Unknown"
 
             w = MODEL_DATA[name]["weight"]
-            if lbl == "Unknown": w *= 0.5 # Unknown oylarının ağırlığını düşür
+            # Unknown oylarının ağırlığını artırdık ki şüphe varsa bilinmiyor çıksın
+            if lbl == "Unknown": w *= 0.8 
             votes[lbl] = votes.get(lbl, 0) + w
             
     best_class = max(votes, key=votes.get)
